@@ -20,9 +20,6 @@ dependencies = [
 [tool.setuptools]
 include-package-data = true
 
-[tool.setuptools.packages.find]
-where = ["cfrx"]
-
 [tool.isort]
 profile = "black"
 
