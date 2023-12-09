@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cfrx"
+description = "Counterfactual Regret Minimization in Jax"
+readme = "README.md"
+authors = [
+  {name="xXx"},
+]
+requires-python = ">=3.8.0"
+version = "0.0.1"
+
+
+[tool.setuptools.packages]
+find = {} # For more details about how to link packages see https://setuptools.pypa.io/en/latest/userguide/pyproject_config.html
+
+[tool.isort]
+profile = "black"
+
+[tool.mypy]
+python_version = 3.8
+namespace_packages = true
+incremental = false
+cache_dir = ""
+warn_redundant_casts = true
+warn_return_any = true
+warn_unused_configs = true
+warn_unused_ignores = false
+allow_redefinition = true
+disallow_untyped_calls = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = false
+strict_optional = true
+strict_equality = true
+explicit_package_bases = true
+follow_imports = "skip"
+ignore_missing_imports = true
