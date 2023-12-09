@@ -11,7 +11,14 @@ authors = [
 ]
 requires-python = ">=3.8.0"
 version = "0.0.1"
+dependencies = [
+  "jaxtyping>=0.2.24",
+  "jax>=0.4.0",
+  "flax>=0.7.0",
+]
 
+[tool.setuptools]
+include-package-data = true
 
 [tool.setuptools.packages]
 find = {} # For more details about how to link packages see https://setuptools.pypa.io/en/latest/userguide/pyproject_config.html
