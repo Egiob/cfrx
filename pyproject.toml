@@ -20,8 +20,8 @@ dependencies = [
 [tool.setuptools]
 include-package-data = true
 
-[tool.setuptools.packages]
-find = {} # For more details about how to link packages see https://setuptools.pypa.io/en/latest/userguide/pyproject_config.html
+[tool.setuptools.packages.find]
+where = ["cfrx"]
 
 [tool.isort]
 profile = "black"
