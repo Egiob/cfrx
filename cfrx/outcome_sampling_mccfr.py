@@ -60,7 +60,7 @@ def compute_regrets_and_strategy_profile(
     policy: TabularPolicy,
     update_player: int,
 ) -> Tuple[Array, Array, Array]:
-    episode_length = episode.reward.shape[-1]
+    episode_length = episode.current_player.shape[-1]
     utility = episode.reward[episode.mask.sum(), update_player]
     is_current_player = episode.current_player == update_player
     strategy_probability_distributions = jax.vmap(
