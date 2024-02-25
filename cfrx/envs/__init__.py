@@ -1,3 +1,3 @@
-from cfrx.envs.base import Env, State
+from cfrx.envs.base import Env, InfoState, State
 
-__all__ = ["Env", "State"]
+__all__ = ["Env", "State", "InfoState"]

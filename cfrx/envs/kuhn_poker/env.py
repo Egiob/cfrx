@@ -5,9 +5,9 @@ import jax.numpy as jnp
 import numpy as np
 import pgx
 import pgx.kuhn_poker
-from flax.struct import PyTreeNode
-from jaxtyping import Array, Bool, Int, PRNGKeyArray, Shaped
+from jaxtyping import Array, Bool, Int, PRNGKeyArray
 from pgx._src.dwg.kuhn_poker import CARD
+from pgx._src.struct import dataclass
 
 import cfrx
 from cfrx.envs.kuhn_poker.constants import INFO_SETS
@@ -25,7 +25,8 @@ class InfoState(NamedTuple):
     action_sequence: Int[Array, "..."]
 
 
-class State(pgx.kuhn_poker.State, PyTreeNode):
+@dataclass
+class State(pgx.kuhn_poker.State):
     info_state: InfoState = InfoState(
         private_card=jnp.int8(-1), action_sequence=jnp.ones(2, dtype=jnp.int8) * -1
     )
@@ -33,7 +34,6 @@ class State(pgx.kuhn_poker.State, PyTreeNode):
     chance_prior: Int[Array, "..."] = (
         jnp.ones(NUM_DIFFERENT_CARDS, dtype=int) * NUM_REPEAT_CARDS
     )
-    _rng_key: Shaped[PRNGKeyArray, "..."] = jnp.zeros(2, dtype=jnp.uint32)
 
 
 class KuhnPoker(pgx.kuhn_poker.KuhnPoker, cfrx.envs.Env):
@@ -86,13 +86,11 @@ class KuhnPoker(pgx.kuhn_poker.KuhnPoker, cfrx.envs.Env):
         env_state = super()._init(rng)
 
         info_state = InfoState(
-            private_card=jnp.int8(-1),
-            action_sequence=jnp.ones(2, dtype=jnp.int8) * -1,
+            private_card=jnp.int8(-1), action_sequence=jnp.ones(2, dtype=jnp.int8) * -1
         )
 
         return State(
-            _rng_key=env_state._rng_key,
-            current_player=env_state.current_player,
+            current_player=env_state.current_player.astype(jnp.int8),
             observation=env_state.observation,
             rewards=env_state.rewards,
             terminated=env_state.terminated,
@@ -107,7 +105,9 @@ class KuhnPoker(pgx.kuhn_poker.KuhnPoker, cfrx.envs.Env):
             chance_prior=jnp.ones(NUM_DIFFERENT_CARDS, dtype=int) * NUM_REPEAT_CARDS,
         )
 
-    def _resolve_chance_node(self, state: State, action: Int[Array, ""]) -> State:
+    def _resolve_chance_node(
+        self, state: State, action: Int[Array, ""], random_key: PRNGKeyArray
+    ) -> State:
         draw_player = NUM_TOTAL_CARDS - state.chance_prior.sum()
 
         cards = state._cards.at[draw_player].set(action.astype(jnp.int8))
@@ -119,8 +119,7 @@ class KuhnPoker(pgx.kuhn_poker.KuhnPoker, cfrx.envs.Env):
         )
 
         return State(
-            _rng_key=state._rng_key,
-            current_player=jnp.int8(state.current_player),
+            current_player=state.current_player.astype(jnp.int8),
             observation=state.observation,
             rewards=state.rewards,
             terminated=state.terminated,
@@ -135,12 +134,13 @@ class KuhnPoker(pgx.kuhn_poker.KuhnPoker, cfrx.envs.Env):
             chance_prior=chance_prior,
         )
 
-    def _resolve_decision_node(self, state: State, action: Int[Array, ""]) -> State:
-        env_state = super()._step(state=state, action=action)
+    def _resolve_decision_node(
+        self, state: State, action: Int[Array, ""], random_key: PRNGKeyArray
+    ) -> State:
+        env_state = super()._step(state=state, action=action, key=random_key)
 
         return State(
-            _rng_key=env_state._rng_key,
-            current_player=env_state.current_player,
+            current_player=env_state.current_player.astype(jnp.int8),
             observation=env_state.observation,
             rewards=env_state.rewards,
             terminated=env_state.terminated,
@@ -155,11 +155,17 @@ class KuhnPoker(pgx.kuhn_poker.KuhnPoker, cfrx.envs.Env):
             chance_prior=env_state.chance_prior,
         )
 
-    def _step(self, state: State, action: Int[Array, ""]) -> State:
+    def _step(
+        self, state: State, action: Int[Array, ""], random_key: PRNGKeyArray
+    ) -> State:
         new_state = jax.lax.cond(
             state.chance_node,
-            lambda: self._resolve_chance_node(state=state, action=action),
-            lambda: self._resolve_decision_node(state=state, action=action),
+            lambda: self._resolve_chance_node(
+                state=state, action=action, random_key=random_key
+            ),
+            lambda: self._resolve_decision_node(
+                state=state, action=action, random_key=random_key
+            ),
         )
         info_state = self.update_info_state(
             state=state, next_state=new_state, action=action

@@ -5,7 +5,7 @@ import jax.numpy as jnp
 import numpy as np
 import pgx
 import pgx.leduc_holdem
-from jaxtyping import Array, Bool, Float, Int, Key, PRNGKeyArray, Shaped
+from jaxtyping import Array, Bool, Float, Int, PRNGKeyArray, Shaped
 from pgx._src.dwg.leduc_holdem import CARD
 from pgx._src.struct import dataclass
 
@@ -58,32 +58,16 @@ class LeducPoker(pgx.leduc_holdem.LeducHoldem, cfrx.envs.Env):
         private_card = next_state._cards[next_state.current_player]
         public_card = next_state._cards[-1]
 
-        def update_chance_node(
-            info_state: InfoState, state: State, next_state: State
-        ) -> InfoState:
-            return info_state
+        current_position = (info_state.action_sequence[state._round] != -1).sum()
+        action_sequence = info_state.action_sequence.at[
+            state._round, current_position
+        ].set(action.astype(jnp.int8))
+        updated_info_state = info_state._replace(action_sequence=action_sequence)
 
-        def update_decision_node(
-            info_state: InfoState, state: State, next_state: State
-        ) -> InfoState:
-            current_position = (info_state.action_sequence[state._round] != -1).sum()
-            action_sequence = info_state.action_sequence.at[
-                state._round, current_position
-            ].set(jnp.int8(action))
-
-            return info_state._replace(action_sequence=action_sequence)
-
-        info_state = jax.lax.cond(
-            state.chance_node,
-            lambda info_state, state, next_state: update_chance_node(
-                info_state, state, next_state
-            ),
-            lambda info_state, state, next_state: update_decision_node(
-                info_state, state, next_state
-            ),
+        info_state = jax.tree_map(
+            lambda x, y: jnp.where(state.chance_node, x, y),
             info_state,
-            state,
-            next_state,
+            updated_info_state,
         )
 
         return info_state._replace(
@@ -119,7 +103,6 @@ class LeducPoker(pgx.leduc_holdem.LeducHoldem, cfrx.envs.Env):
         )
         cards = jnp.int8([-1, -1, -1])
         return State(
-            _rng_key=env_state._rng_key,
             _first_player=env_state._first_player,
             current_player=env_state.current_player,
             observation=env_state.observation,
@@ -138,8 +121,10 @@ class LeducPoker(pgx.leduc_holdem.LeducHoldem, cfrx.envs.Env):
             chance_node=True,
         )
 
-    def _resolve_decision_node(self, state: State, action: Int[Array, ""]) -> State:
-        env_state = super()._step(state=state, action=action)
+    def _resolve_decision_node(
+        self, state: State, action: Int[Array, ""], random_key: PRNGKeyArray
+    ) -> State:
+        env_state = super()._step(state=state, action=action, key=random_key)
 
         is_public_card_unknown = env_state._cards[-1] == -1
         chance_node = (
@@ -153,7 +138,6 @@ class LeducPoker(pgx.leduc_holdem.LeducHoldem, cfrx.envs.Env):
         )
 
         state = State(
-            _rng_key=env_state._rng_key,
             _first_player=env_state._first_player,
             current_player=env_state.current_player,
             observation=env_state.observation,
@@ -162,7 +146,7 @@ class LeducPoker(pgx.leduc_holdem.LeducHoldem, cfrx.envs.Env):
             truncated=env_state.truncated,
             _step_count=env_state._step_count,
             _last_action=env_state._last_action,
-            _round=env_state._round,
+            _round=env_state._round.astype(jnp.int8),
             _cards=env_state._cards,
             legal_action_mask=legal_action_mask,
             _chips=env_state._chips,
@@ -174,9 +158,11 @@ class LeducPoker(pgx.leduc_holdem.LeducHoldem, cfrx.envs.Env):
 
         return state
 
-    def _resolve_chance_node(self, state: State, action: Int[Array, ""]) -> State:
+    def _resolve_chance_node(
+        self, state: State, action: Int[Array, ""], random_key: PRNGKeyArray
+    ) -> State:
         draw_player = NUM_TOTAL_CARDS - state.chance_prior.sum()
-        cards = state._cards.at[draw_player].set(jnp.int8(action))
+        cards = state._cards.at[draw_player].set(action.astype(jnp.int8))
         chance_prior = state.chance_prior.at[action].add(-1)
         chance_node = (cards[:2] == -1).any()
 
@@ -186,7 +172,6 @@ class LeducPoker(pgx.leduc_holdem.LeducHoldem, cfrx.envs.Env):
             jnp.ones_like(state.legal_action_mask).at[-1].set(False),
         )
         return State(
-            _rng_key=state._rng_key,
             _first_player=state._first_player,
             current_player=state.current_player,
             observation=state.observation,
@@ -195,7 +180,7 @@ class LeducPoker(pgx.leduc_holdem.LeducHoldem, cfrx.envs.Env):
             truncated=state.truncated,
             _step_count=state._step_count,
             _last_action=state._last_action,
-            _round=state._round,
+            _round=state._round.astype(jnp.int8),
             _cards=cards,
             legal_action_mask=legal_action_mask,
             _chips=state._chips,
@@ -205,11 +190,15 @@ class LeducPoker(pgx.leduc_holdem.LeducHoldem, cfrx.envs.Env):
             chance_node=chance_node,
         )
 
-    def _step(self, state: State, action: Array) -> State:
+    def _step(self, state: State, action: Array, random_key: PRNGKeyArray) -> State:
         new_state = jax.lax.cond(
             state.chance_node,
-            lambda: self._resolve_chance_node(state=state, action=action),
-            lambda: self._resolve_decision_node(state=state, action=action),
+            lambda: self._resolve_chance_node(
+                state=state, action=action, random_key=random_key
+            ),
+            lambda: self._resolve_decision_node(
+                state=state, action=action, random_key=random_key
+            ),
         )
 
         _round = jnp.where(new_state._cards[-1] != -1, jnp.maximum(state._round, 1), 0)

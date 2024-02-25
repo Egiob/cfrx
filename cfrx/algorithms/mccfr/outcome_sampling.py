@@ -7,8 +7,7 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float, Int, PRNGKeyArray
 
-from cfrx.envs import Env, State
-from cfrx.envs.kuhn_poker.env import InfoState
+from cfrx.envs import Env, InfoState, State
 from cfrx.episode import Episode
 from cfrx.policy import Policy, TabularPolicy
 
@@ -91,7 +90,7 @@ def compute_regrets_and_strategy_profile(
     training_state: MCCFRState,
     policy: TabularPolicy,
     update_player: Int[Array, ""],
-) -> tuple[InfoState, Float[Array, "..."], Float[Array, "..."]]:
+) -> tuple[InfoState[Array, "..."], Float[Array, "..."], Float[Array, "..."]]:
     episode_length = episode.current_player.shape[-1]
     utility = episode.reward[episode.mask.sum(), update_player]
     is_current_player = episode.current_player == update_player

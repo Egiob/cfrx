@@ -2,7 +2,7 @@ from typing import NamedTuple
 
 from jaxtyping import Array, Bool, Float, Int
 
-from cfrx.envs.kuhn_poker.env import InfoState
+from cfrx.envs.base import InfoState
 
 
 class Episode(NamedTuple):

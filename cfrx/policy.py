@@ -3,9 +3,9 @@ from collections.abc import Callable
 
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, Bool, Float, Int, Key, PRNGKeyArray
+from jaxtyping import Array, Bool, Float, Int, PRNGKeyArray
 
-from cfrx.envs.kuhn_poker.env import InfoState
+from cfrx.envs.base import InfoState
 
 
 class Policy(ABC):
@@ -15,7 +15,7 @@ class Policy(ABC):
     def prob_distribution(
         self,
         params: Float[Array, "... a"],
-        info_state: InfoState,
+        info_state: InfoState[Array, "..."],
         action_mask: Bool[Array, "... a"],
         use_behavior_policy: Bool[Array, "..."],
     ) -> Array:
@@ -25,7 +25,7 @@ class Policy(ABC):
     def sample(
         self,
         params: Float[Array, "... a"],
-        info_state: InfoState,
+        info_state: InfoState[Array, "..."],
         action_mask: Bool[Array, "... a"],
         random_key: PRNGKeyArray,
         use_behavior_policy: Bool[Array, "..."],
@@ -47,7 +47,7 @@ class TabularPolicy(Policy):
     def prob_distribution(
         self,
         params: Float[Array, "... a"],
-        info_state: InfoState,
+        info_state: InfoState[Array, "..."],
         action_mask: Bool[Array, "... a"],
         use_behavior_policy: Bool[Array, "..."],
     ) -> Array:
@@ -67,7 +67,7 @@ class TabularPolicy(Policy):
     def sample(
         self,
         params: Float[Array, "... a"],
-        info_state: InfoState,
+        info_state: InfoState[Array, "..."],
         action_mask: Bool[Array, "... a"],
         random_key: PRNGKeyArray,
         use_behavior_policy: Bool[Array, "..."],
