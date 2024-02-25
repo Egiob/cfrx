@@ -1,2 +1,2 @@
 from cfrx.metrics.best_response import compute_best_response_value
-from cfrx.metrics.exploitability import compute_exploitability_value
+from cfrx.metrics.exploitability import exploitability

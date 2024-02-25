@@ -1,34 +1,39 @@
+from typing import NamedTuple
+
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pgx
 import pgx.kuhn_poker
 from flax.struct import PyTreeNode
-from jaxtyping import Array, Bool, Float, Int, Key
+from jaxtyping import Array, Bool, Int, PRNGKeyArray, Shaped
+from pgx._src.dwg.kuhn_poker import CARD
 
-import cfrx.envs
+import cfrx
 from cfrx.envs.kuhn_poker.constants import INFO_SETS
 from cfrx.utils import ravel, reverse_array_lookup
 
+CARD.append("?")
 NUM_DIFFERENT_CARDS = 3
 NUM_REPEAT_CARDS = 1
 NUM_TOTAL_CARDS = NUM_DIFFERENT_CARDS * NUM_REPEAT_CARDS
 INFO_SETS_VALUES = np.stack(list(INFO_SETS.values()))
 
 
-class InfoState(PyTreeNode, cfrx.envs.InfoState):
-    private_card: Int[Array, ""]
+class InfoState(NamedTuple):
+    private_card: Int[Array, "..."]
     action_sequence: Int[Array, "..."]
 
 
-class State(PyTreeNode, pgx.kuhn_poker.State):
+class State(pgx.kuhn_poker.State, PyTreeNode):
     info_state: InfoState = InfoState(
         private_card=jnp.int8(-1), action_sequence=jnp.ones(2, dtype=jnp.int8) * -1
     )
-    chance_node: Bool[Array, ""] = jnp.bool_(False)
-    chance_prior: Float[Array, "..."] = (
+    chance_node: Bool[Array, "..."] = jnp.bool_(False)
+    chance_prior: Int[Array, "..."] = (
         jnp.ones(NUM_DIFFERENT_CARDS, dtype=int) * NUM_REPEAT_CARDS
     )
+    _rng_key: Shaped[PRNGKeyArray, "..."] = jnp.zeros(2, dtype=jnp.uint32)
 
 
 class KuhnPoker(pgx.kuhn_poker.KuhnPoker, cfrx.envs.Env):
@@ -57,10 +62,10 @@ class KuhnPoker(pgx.kuhn_poker.KuhnPoker, cfrx.envs.Env):
 
         action_sequence = jnp.where(state.chance_node, -1, action_sequence)
 
-        info_state = info_state.replace(
+        info_state = info_state._replace(
             private_card=private_card, action_sequence=action_sequence
         )
-        return info_state  # type: ignore
+        return info_state
 
     def info_state_to_str(self, info_state: InfoState) -> str:
         strings = ["b", "p"]
@@ -75,9 +80,9 @@ class KuhnPoker(pgx.kuhn_poker.KuhnPoker, cfrx.envs.Env):
 
     def info_state_idx(self, info_state: InfoState) -> Int[Array, ""]:
         info_state_ravel = ravel(info_state)
-        return reverse_array_lookup(info_state_ravel, INFO_SETS_VALUES)
+        return reverse_array_lookup(info_state_ravel, jnp.asarray(INFO_SETS_VALUES))
 
-    def _init(self, rng: Key[Array, ""]) -> State:
+    def _init(self, rng: PRNGKeyArray) -> State:
         env_state = super()._init(rng)
 
         info_state = InfoState(
@@ -95,7 +100,7 @@ class KuhnPoker(pgx.kuhn_poker.KuhnPoker, cfrx.envs.Env):
             _step_count=env_state._step_count,
             _last_action=env_state._last_action,
             _cards=jnp.int8([-1, -1]),
-            legal_action_mask=jnp.ones_like(env_state.legal_action_mask).astype(bool),
+            legal_action_mask=jnp.bool_([1, 1, 1, 1]),
             _pot=env_state._pot,
             info_state=info_state,
             chance_node=jnp.bool_(True),
@@ -159,4 +164,4 @@ class KuhnPoker(pgx.kuhn_poker.KuhnPoker, cfrx.envs.Env):
         info_state = self.update_info_state(
             state=state, next_state=new_state, action=action
         )
-        return new_state.replace(info_state=info_state)  # type: ignore
+        return new_state.replace(info_state=info_state)

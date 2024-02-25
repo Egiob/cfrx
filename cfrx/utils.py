@@ -7,10 +7,8 @@ import jax.flatten_util
 import jax.numpy as jnp
 from jaxtyping import Array, Bool, Int, PyTree
 
-import cfrx.envs
 
-
-def get_action_mask(state: cfrx.envs.State) -> Bool[Array, "..."]:
+def get_action_mask(state: PyTree) -> Bool[Array, "..."]:
     chance_action_mask = state.chance_prior > 0
     decision_action_mask = state.legal_action_mask
     max_action_mask_size = max(
@@ -50,15 +48,15 @@ def tree_unstack(tree: PyTree) -> list[PyTree]:
 
 
 def ravel(tree: PyTree) -> Array:
-    return jax.flatten_util.ravel_pytree(tree)[0]  # type: ignore
+    return jax.flatten_util.ravel_pytree(tree)[0]
 
 
 def regret_matching(regrets: Array) -> Array:
     positive_regrets = jnp.maximum(regrets, 0)
-    num_actions = positive_regrets.shape[-1]
+    n_actions = positive_regrets.shape[-1]
     sum_pos_regret = positive_regrets.sum(axis=-1, keepdims=True)
     dist = jnp.where(
-        sum_pos_regret == 0, 1 / num_actions, positive_regrets / sum_pos_regret
+        sum_pos_regret == 0, 1 / n_actions, positive_regrets / sum_pos_regret
     )
     return dist
 

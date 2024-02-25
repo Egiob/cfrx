@@ -5,13 +5,15 @@ import jax.numpy as jnp
 import numpy as np
 import pgx
 import pgx.leduc_holdem
-from jaxtyping import Array, Bool, Float, Int, Key
+from jaxtyping import Array, Bool, Float, Int, Key, PRNGKeyArray, Shaped
+from pgx._src.dwg.leduc_holdem import CARD
 from pgx._src.struct import dataclass
 
 import cfrx.envs
 from cfrx.envs.leduc_poker.constants import INFO_SETS
 from cfrx.utils import ravel, reverse_array_lookup
 
+CARD.append("?")
 INFO_SETS_VALUES = np.stack(list(INFO_SETS.values()))
 NUM_DIFFERENT_CARDS = 3
 NUM_REPEAT_CARDS = 2
@@ -108,7 +110,7 @@ class LeducPoker(pgx.leduc_holdem.LeducHoldem, cfrx.envs.Env):
         info_state_ravel = ravel(info_state)
         return reverse_array_lookup(info_state_ravel, INFO_SETS_VALUES)
 
-    def _init(self, rng: Key[Array, ""]) -> State:
+    def _init(self, rng: Shaped[PRNGKeyArray, "2"]) -> State:
         env_state = super()._init(rng)
         info_state = InfoState(
             private_card=jnp.int8(-1),
@@ -216,4 +218,4 @@ class LeducPoker(pgx.leduc_holdem.LeducHoldem, cfrx.envs.Env):
             state=state, next_state=new_state, action=action
         )
 
-        return new_state.replace(info_state=info_state)  # type: ignore
+        return new_state.replace(info_state=info_state)

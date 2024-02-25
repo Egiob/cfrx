@@ -3,7 +3,7 @@ from typing import Tuple
 import jax
 import jax.numpy as jnp
 import pgx
-from jaxtyping import Array, Bool, Float, Int
+from jaxtyping import Array, Bool, Float, Int, PyTree
 
 from cfrx.policy import Policy
 from cfrx.tree import Root, Tree
@@ -12,53 +12,51 @@ from cfrx.utils import get_action_mask
 
 def instantiate_tree_from_root(
     root: Root,
-    num_max_nodes: int,
-    num_players: int,
+    n_max_nodes: int,
+    n_players: int,
     running_probabilities: bool = False,
 ) -> Tree:
     """Initializes tree state at search root."""
-    (num_actions,) = root.prior_logits.shape
+    (n_actions,) = root.prior_logits.shape
 
     data_dtype = root.value.dtype
 
     def _zeros(x: Array) -> Array:
-        return jnp.zeros((num_max_nodes,) + x.shape, dtype=x.dtype)
+        return jnp.zeros((n_max_nodes,) + x.shape, dtype=x.dtype)
 
     # Create a new empty tree state and fill its root.
-    tree = Tree(  #
-        node_visits=jnp.zeros(num_max_nodes, dtype=jnp.int32),
-        raw_values=jnp.zeros((num_max_nodes, num_players), dtype=data_dtype),
-        node_values=jnp.zeros((num_max_nodes, num_players), dtype=data_dtype),
+    tree = Tree(
+        node_visits=jnp.zeros(n_max_nodes, dtype=jnp.int32),
+        raw_values=jnp.zeros((n_max_nodes, n_players), dtype=data_dtype),
+        node_values=jnp.zeros((n_max_nodes, n_players), dtype=data_dtype),
         parents=jnp.full(
-            num_max_nodes,
-            Tree.NO_PARENT,  # type: ignore
+            n_max_nodes,
+            Tree.NO_PARENT,
             dtype=jnp.int32,
         ),
         action_from_parent=jnp.full(
-            num_max_nodes,
-            Tree.NO_PARENT,  # type: ignore
+            n_max_nodes,
+            Tree.NO_PARENT,
             dtype=jnp.int32,
-        ),  # type: ignore
+        ),
         children_index=jnp.full(
-            (num_max_nodes, num_actions),
-            Tree.UNVISITED,  # type: ignore
+            (n_max_nodes, n_actions),
+            Tree.UNVISITED,
             dtype=jnp.int32,
         ),
         children_prior_logits=jnp.zeros(
-            (num_max_nodes, num_actions), dtype=root.prior_logits.dtype
+            (n_max_nodes, n_actions), dtype=root.prior_logits.dtype
         ),
-        children_values=jnp.zeros(
-            (num_max_nodes, num_actions, num_players), dtype=data_dtype
-        ),
-        children_visits=jnp.zeros((num_max_nodes, num_actions), dtype=jnp.int32),
+        children_values=jnp.zeros((n_max_nodes, n_actions, n_players), dtype=data_dtype),
+        children_visits=jnp.zeros((n_max_nodes, n_actions), dtype=jnp.int32),
         children_rewards=jnp.zeros(
-            (num_max_nodes, num_actions, num_players), dtype=data_dtype
+            (n_max_nodes, n_actions, n_players), dtype=data_dtype
         ),
         states=jax.tree_util.tree_map(_zeros, root.state),
-        depth=jnp.ones(num_max_nodes, dtype=jnp.int32) * -1,
+        depth=jnp.ones(n_max_nodes, dtype=jnp.int32) * -1,
         extra_data={},
     )
-    new_tree: Tree = tree.replace(
+    new_tree: Tree = tree._replace(
         node_visits=tree.node_visits.at[Tree.ROOT_INDEX].set(1),
         # node_values=tree.node_values.at[Tree.ROOT_INDEX].set(root.value),
         states=jax.tree_map(
@@ -78,25 +76,24 @@ def instantiate_tree_from_root(
 
 
 def initialize_running_probabilities(tree: Tree) -> Tree:
-    num_max_nodes = tree.node_visits.shape[-1]
-    init_prob = (jnp.ones(num_max_nodes) * -1).at[Tree.ROOT_INDEX].set(1.0)
+    n_max_nodes = tree.node_visits.shape[-1]
+    init_prob = (jnp.ones(n_max_nodes) * -1).at[Tree.ROOT_INDEX].set(1.0)
     running_probabilities = {
         "p_self": init_prob,
         "p_opponent": init_prob,
         "p_chance": init_prob,
     }
-    tree = tree.replace(extra_data={**tree.extra_data, **running_probabilities})
-    return tree  # type: ignore
+    tree = tree._replace(extra_data={**tree.extra_data, **running_probabilities})
+    return tree
 
 
 def select_new_node_and_play(
     tree: Tree, env: pgx.Env
-) -> Tuple[pgx.State, Int[Array, ""], Int[Array, ""]]:
+) -> tuple[PyTree, Int[Array, ""], Int[Array, ""]]:
     action_mask = jax.vmap(get_action_mask)(tree.states)
 
     is_to_visit = (
-        (action_mask * (1 - tree.states.terminated)[..., None] * tree.children_index)
-        < 0
+        (action_mask * (1 - tree.states.terminated)[..., None] * tree.children_index) < 0
     ).any(axis=1)
 
     parent_index = jnp.argmax(is_to_visit)
@@ -159,7 +156,7 @@ def update_running_probabilities(
         p_chance[parent_index],
     )
 
-    tree = tree.replace(
+    tree = tree._replace(
         extra_data={
             **tree.extra_data,
             **{
@@ -169,7 +166,7 @@ def update_running_probabilities(
             },
         }
     )
-    return tree  # type: ignore
+    return tree
 
 
 def traverse_tree_vanilla(
@@ -178,18 +175,14 @@ def traverse_tree_vanilla(
 ) -> Tree:
     def cond_fn(val: Tuple) -> Bool[Array, ""]:
         tree, n = val
-        num_max_nodes = len(tree.node_visits)
+        n_max_nodes = len(tree.node_visits)
         action_mask = jax.vmap(get_action_mask)(tree.states)
         is_to_visit = (
-            (
-                action_mask
-                * (1 - tree.states.terminated)[..., None]
-                * tree.children_index
-            )
+            (action_mask * (1 - tree.states.terminated)[..., None] * tree.children_index)
             < 0
         ).any(axis=1)
 
-        return jnp.logical_and(is_to_visit.any(), (n < num_max_nodes))
+        return jnp.logical_and(is_to_visit.any(), (n < n_max_nodes))
 
     def loop_fn(val: Tuple) -> Tuple:
         tree, n = val
@@ -205,7 +198,7 @@ def traverse_tree_vanilla(
 
         strategy = action_mask / action_mask.sum()
 
-        tree = tree.replace(
+        tree = tree._replace(
             node_visits=tree.node_visits.at[next_node_index].set(1),
             node_values=tree.node_values.at[next_node_index].set(new_state.rewards),
             states=jax.tree_map(
@@ -244,22 +237,18 @@ def traverse_tree_cfr(
     env: pgx.Env,
     traverser: int = 0,
 ) -> Tree:
-    def cond_fn(val: Tuple) -> Bool[Array, ""]:
+    def cond_fn(val: tuple[Tree, Int[Array, ""]]) -> Bool[Array, ""]:
         tree, n = val
-        num_max_nodes = len(tree.node_visits)
+        n_max_nodes = len(tree.node_visits)
         action_mask = jax.vmap(get_action_mask)(tree.states)
         is_to_visit = (
-            (
-                action_mask
-                * (1 - tree.states.terminated)[..., None]
-                * tree.children_index
-            )
+            (action_mask * (1 - tree.states.terminated)[..., None] * tree.children_index)
             < 0
         ).any(axis=1)
 
-        return jnp.logical_and(is_to_visit.any(), (n < num_max_nodes))
+        return jnp.logical_and(is_to_visit.any(), (n < n_max_nodes))
 
-    def loop_fn(val: Tuple) -> Tuple:
+    def loop_fn(val: tuple[Tree, Int[Array, ""]]) -> tuple[Tree, Int[Array, ""]]:
         tree, n = val
 
         n += 1
@@ -268,22 +257,19 @@ def traverse_tree_cfr(
         new_state, parent_index, action = select_new_node_and_play(tree, env)
 
         parent_state = jax.tree_map(lambda x: x[parent_index], tree.states)
-        parent_info_state_idx = env.info_state_idx(parent_state.info_state)
 
-        num_actions = len(get_action_mask(parent_state))
+        n_actions = len(get_action_mask(parent_state))
 
-        strategy = policy.probability_distribution(
-            probs=policy_params,
-            info_state=parent_info_state_idx,
+        strategy = policy.prob_distribution(
+            params=policy_params,
+            info_state=parent_state.info_state,
             action_mask=parent_state.legal_action_mask,
             use_behavior_policy=jnp.bool_(False),
         )
-        strategy = jnp.pad(strategy, (0, num_actions - len(strategy)))
+        strategy = jnp.pad(strategy, (0, n_actions - len(strategy)))
 
         chance_strategy = parent_state.chance_prior / parent_state.chance_prior.sum()
-        chance_strategy = jnp.pad(
-            chance_strategy, (0, num_actions - len(chance_strategy))
-        )
+        chance_strategy = jnp.pad(chance_strategy, (0, n_actions - len(chance_strategy)))
 
         current_strategy = jnp.where(
             parent_state.chance_node,
@@ -300,7 +286,7 @@ def traverse_tree_cfr(
             traverser=traverser,
         )
 
-        tree = tree.replace(
+        tree = tree._replace(
             node_visits=tree.node_visits.at[next_node_index].set(1),
             node_values=tree.node_values.at[next_node_index].set(new_state.rewards),
             states=jax.tree_map(
