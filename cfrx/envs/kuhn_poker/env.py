@@ -47,6 +47,26 @@ class KuhnPoker(pgx.kuhn_poker.KuhnPoker, cfrx.envs.Env):
             rep = "?"
         return rep
 
+    @property
+    def max_episode_length(self) -> int:
+        return 6
+
+    @property
+    def max_nodes(self) -> int:
+        return 60
+
+    @property
+    def n_info_states(self) -> int:
+        return len(INFO_SETS)
+
+    @property
+    def n_actions(self) -> int:
+        return self.num_actions
+
+    @property
+    def n_players(self) -> int:
+        return self.num_players
+
     def update_info_state(
         self, state: State, next_state: State, action: Int[Array, ""]
     ) -> InfoState:

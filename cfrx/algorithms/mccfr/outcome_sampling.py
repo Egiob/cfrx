@@ -10,6 +10,7 @@ from jaxtyping import Array, Float, Int, PRNGKeyArray
 from cfrx.envs import Env, InfoState, State
 from cfrx.episode import Episode
 from cfrx.policy import Policy, TabularPolicy
+from cfrx.utils import regret_matching
 
 
 class MCCFRState(NamedTuple):
@@ -234,3 +235,67 @@ def unroll(
         last_game_step,
     )
     return episode, states
+
+
+def do_iteration(
+    training_state: MCCFRState,
+    random_key: PRNGKeyArray,
+    env: Env,
+    policy: TabularPolicy,
+    update_player: Int[Array, ""],
+) -> tuple[Float[Array, "*batch a"], Float[Array, "*batch a"], Episode]:
+    """
+    Do one iteration of MCCFR: traverse the game tree once and compute counterfactual
+    regrets and strategy profiles.
+
+    Args:
+        training_state: The current state of the training.
+        random_key: A random key.
+        env: The environment.
+        policy: The policy.
+        update_player: The player to update.
+
+    Returns:
+        The updated regrets and average strategy profile and the episode.
+    """
+
+    # Sample one path in the game tree
+    random_key, subkey = jax.random.split(random_key)
+    episode, states = unroll(
+        init_state=env.init(subkey),
+        training_state=training_state,
+        random_key=subkey,
+        update_player=update_player,
+        env=env,
+        policy=policy,
+        n_max_steps=env.max_episode_length,
+    )
+
+    # Compute counterfactual values and strategy profile
+    (
+        info_states,
+        sampled_regrets,
+        sampled_avg_probs,
+    ) = compute_regrets_and_strategy_profile(
+        episode=episode,
+        training_state=training_state,
+        policy=policy,
+        update_player=update_player,
+    )
+    info_states_idx = jax.vmap(env.info_state_idx)(info_states)
+
+    # Store regret and strategy profile values
+    new_regrets = training_state.regrets.at[info_states_idx].add(sampled_regrets)
+    new_avg_probs = training_state.avg_probs.at[info_states_idx].add(sampled_avg_probs)
+
+    # Accumulate regrets, compute new strategy and avg strategy
+    new_probs = regret_matching(new_regrets)
+    new_probs /= new_probs.sum(axis=-1, keepdims=True)
+
+    training_state = training_state._replace(
+        regrets=new_regrets,
+        probs=new_probs,
+        avg_probs=new_avg_probs,
+        step=training_state.step + 1,
+    )
+    return training_state

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-import pgx
+import pgx.core
 from jaxtyping import Array, Int, PyTree
 
 InfoState = PyTree
