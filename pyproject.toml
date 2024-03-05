@@ -38,6 +38,11 @@ classifiers = [
 [tool.setuptools]
 include-package-data = true
 
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["*"]
+exclude = ["imgs"]
+
 [tool.isort]
 profile = "black"
 

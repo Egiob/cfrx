@@ -69,7 +69,7 @@ training_state = trainer.train(
 
 Below is a small benchmark against `open_spiel` for MCCFR-outcome-sampling on Kuhn Poker and Leduc Poker. Compared to the Python API of `open_spiel`, `cfrx` has faster runtime and demonstrates similar convergence.
 
-![benchmarck_againt_open_spiel](imgs/bench_open_spiel_v0_0_1.png)
+![benchmarck_against_open_spiel_img](imgs/bench_open_spiel_v0_0_1.png)
 
 ## See also
 
