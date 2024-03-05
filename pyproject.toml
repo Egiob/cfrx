@@ -13,7 +13,7 @@ authors = [
   {name="Raphaël Boige"},
 ]
 requires-python = ">=3.8.0"
-version = "0.0.0"
+version = "0.0.1"
 dependencies = [
   "jaxtyping>=0.2.25",
   "jax>=0.4.0",
@@ -71,7 +71,7 @@ ignore_missing_imports = true
 line-length = 89
 
 [tool.bumpver]
-current_version = "0.0.0"
+current_version = "0.0.1"
 version_pattern = "MAJOR.MINOR.PATCH"
 commit_message  = "build: bump version {old_version} -> {new_version}"
 commit          = true
