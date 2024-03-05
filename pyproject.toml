@@ -73,7 +73,7 @@ line-length = 89
 [tool.bumpver]
 current_version = "0.0.1"
 version_pattern = "MAJOR.MINOR.PATCH"
-commit_message  = "feat: bump version {old_version} -> {new_version}"
+commit_message  = "build: bump version {old_version} -> {new_version}"
 commit          = true
 tag             = true
 push            = false
