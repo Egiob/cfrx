@@ -79,3 +79,16 @@ cfrx is heavily inspired by the amazing [google-deepmind/open_spiel](https://git
 ## Contributing
 
 Contributions are welcome, refer to the [contributions guidelines](CONTRIBUTING.md).
+
+## Citing
+
+If you use cfrx in your work, please use the following citation.
+
+    @misc{boige_cfrx,
+      author       = {Boige, Raphaël},
+      title        = {cfrx: Counterfactual Regret Minimization in Jax},
+      year         = {2023},
+      publisher    = {GitHub},
+      journal      = {GitHub repository},
+      howpublished = {\url{https://github.com/Egiob/cfrx}},
+    }
