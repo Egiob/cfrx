@@ -10,8 +10,8 @@ from jaxtyping import Array, Float, Int
 from cfrx.envs import Env
 from cfrx.policy import TabularPolicy
 from cfrx.tree import Tree
-from cfrx.tree.traverse_old import instantiate_tree_from_root, traverse_tree_cfr
-from cfrx.tree.tree_old import Root
+from cfrx.tree.traverse import instantiate_tree_from_root, traverse_tree_cfr
+from cfrx.tree.tree import Root
 from cfrx.utils import regret_matching
 
 

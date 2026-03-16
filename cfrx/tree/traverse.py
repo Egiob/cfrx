@@ -167,7 +167,6 @@ def select_new_node_and_play(
     action = tree.action_from_parent[child_index]
 
     parent_state = jax.tree_map(lambda x: x[parent_index], tree.states)
-    print(parent_state.legal_action_mask.shape)
     new_state = env.step(parent_state, action)
 
     return new_state, parent_index, child_index, action
@@ -318,8 +317,8 @@ def traverse_tree_cfr(
             use_behavior_policy=jnp.bool_(False),
         )
 
-        chance_strategy = env.get_chance_probs(parent_state)[action]
-        # jax.debug.breakpoint()
+        chance_probs = env.get_chance_probs(parent_state)
+        chance_strategy = chance_probs[action]
 
         action_prob = jnp.where(
             parent_state.chance_node, chance_strategy, strategy[action]
@@ -348,7 +347,7 @@ def traverse_tree_cfr(
                 new_state.rewards
             ),
             children_prior_logits=tree.children_prior_logits.at[parent_index].set(
-                jnp.where(parent_state.chance_node, chance_strategy, strategy)
+                jnp.where(parent_state.chance_node, chance_probs, strategy)
             ),
             parents=tree.parents.at[child_index].set(parent_index),
             action_from_parent=tree.action_from_parent.at[child_index].set(action),
